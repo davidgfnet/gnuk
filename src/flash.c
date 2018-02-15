@@ -58,7 +58,7 @@
  *         a page contains a key data of:
  *              For RSA-2048: 512-byte (p, q and N)
  *              For RSA-4096: 1024-byte (p, q and N)
- *              For ECDSA/ECDH and EdDSA, there are padding after public key
+ *              For ECDSA/ECDH and EdDSA, there is padding after public key
  * _data_pool
  *	   <two pages>
  */

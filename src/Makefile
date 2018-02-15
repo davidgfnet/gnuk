@@ -12,16 +12,14 @@ CSRC = main.c call-rsa.c \
 	modp256r1.c jpc_p256r1.c ec_p256r1.c call-ec_p256r1.c \
 	modp256k1.c jpc_p256k1.c ec_p256k1.c call-ec_p256k1.c \
 	mod25638.c ecc-edwards.c ecc-mont.c sha512.c \
-	random.c neug.c sha256.c
+	random.c neug.c sha256.c aes.c sha-common.c
 
 INCDIR =
 
 CRYPTDIR = ../polarssl
 CRYPTSRCDIR = $(CRYPTDIR)/library
 CRYPTINCDIR = $(CRYPTDIR)/include
-CRYPTSRC = $(CRYPTSRCDIR)/bignum.c $(CRYPTSRCDIR)/rsa.c $(CRYPTSRCDIR)/aes.c
 
-CSRC += $(CRYPTSRC)
 INCDIR += $(CRYPTINCDIR)
 
 include config.mk
@@ -31,10 +29,17 @@ USE_USB = yes
 USE_ADC = yes
 USE_EVENTFLAG = yes
 
-ifeq ($(EMULATION),)
-DEFS += -DFLASH_UPGRADE_SUPPORT
-else
+ifneq ($(EMULATION),)
 DEFS += -DBN256_C_IMPLEMENTATION
+endif
+
+ifeq ($(DISABLE_FLASH_UPGRADES),)
+DEFS += -DFLASH_UPGRADE_SUPPORT
+endif
+
+ifneq ($(RSA_SUPPORT),)
+DEFS += -DALGO_ENABLE_RSA
+CSRC += $(CRYPTSRCDIR)/bignum.c $(CRYPTSRCDIR)/rsa.c
 endif
 
 ifneq ($(ENABLE_DEBUG),)
@@ -60,6 +65,10 @@ OBJCOPY   = $(CROSS)objcopy
 
 CWARN = -Wall -Wextra -Wstrict-prototypes
 OPT   = -O3 -Os -g
+
+ifneq ($(OPTIMIZE_SIZE),)
+OPT += -DHASH_OPTIMIZE_SIZE
+endif
 
 #######################
 include $(CHOPSTX)/rules.mk

@@ -908,6 +908,7 @@ cmd_pso (void)
 	  return;
 	}
 
+      #ifdef ALGO_ENABLE_RSA
       if (attr == ALGO_RSA2K || attr == ALGO_RSA4K)
 	{
 	  /* Check size of digestInfo */
@@ -929,7 +930,9 @@ cmd_pso (void)
 	  r = rsa_sign (apdu.cmd_apdu_data, res_APDU, len,
 			&kd[GPG_KEY_FOR_SIGNING], pubkey_len);
 	}
-      else if (attr == ALGO_NISTP256R1 || attr == ALGO_SECP256K1)
+      else
+      #endif
+      if (attr == ALGO_NISTP256R1 || attr == ALGO_SECP256K1)
 	{
 	  /* ECDSA with p256r1/p256k1 for signature */
 	  if (len != ECDSA_HASH_LEN)
@@ -999,6 +1002,7 @@ cmd_pso (void)
 	  return;
 	}
 
+      #ifdef ALGO_ENABLE_RSA
       if (attr == ALGO_RSA2K || attr == ALGO_RSA4K)
 	{
 	  /* Skip padding 0x00 */
@@ -1011,7 +1015,9 @@ cmd_pso (void)
 	  r = rsa_decrypt (apdu.cmd_apdu_data+1, res_APDU, len,
 			   &kd[GPG_KEY_FOR_DECRYPTION], &result_len);
 	}
-      else if (attr == ALGO_NISTP256R1 || attr == ALGO_SECP256K1)
+      else
+      #endif
+      if (attr == ALGO_NISTP256R1 || attr == ALGO_SECP256K1)
 	{
 	  int header = ECC_CIPHER_DO_HEADER_SIZE;
 
@@ -1105,6 +1111,7 @@ cmd_internal_authenticate (void)
       return;
     }
 
+  #ifdef ALGO_ENABLE_RSA
   if (attr == ALGO_RSA2K || attr == ALGO_RSA4K)
     {
       if (len > MAX_RSA_DIGEST_INFO_LEN)
@@ -1118,7 +1125,9 @@ cmd_internal_authenticate (void)
       r = rsa_sign (apdu.cmd_apdu_data, res_APDU, len,
 		    &kd[GPG_KEY_FOR_AUTHENTICATION], pubkey_len);
     }
-  else if (attr == ALGO_NISTP256R1)
+  else
+  #endif
+  if (attr == ALGO_NISTP256R1)
     {
       if (len != ECDSA_HASH_LEN)
 	{

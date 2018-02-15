@@ -32,7 +32,7 @@
 #include "status-code.h"
 #include "random.h"
 #include "polarssl/config.h"
-#include "polarssl/aes.h"
+#include "aes.h"
 #include "sha512.h"
 
 /* Forward declaration */
@@ -954,17 +954,13 @@ proc_resetting_code (const uint8_t *data, int len)
 static void
 encrypt (const uint8_t *key, const uint8_t *iv, uint8_t *data, int len)
 {
-  aes_context aes;
-  uint8_t iv0[INITIAL_VECTOR_SIZE];
-  size_t iv_offset;
+  struct AES_ctx aes;
 
   DEBUG_INFO ("ENC\r\n");
   DEBUG_BINARY (data, len);
 
-  aes_setkey_enc (&aes, key, 128);
-  memcpy (iv0, iv, INITIAL_VECTOR_SIZE);
-  iv_offset = 0;
-  aes_crypt_cfb128 (&aes, AES_ENCRYPT, len, &iv_offset, iv0, data, data);
+  AES_init_ctx_iv(&aes, key, iv);
+  AES_CFB_encrypt(&aes, data, len);
 }
 
 /* For three keys: Signing, Decryption, and Authentication */
@@ -973,14 +969,9 @@ struct key_data kd[3];
 static void
 decrypt (const uint8_t *key, const uint8_t *iv, uint8_t *data, int len)
 {
-  aes_context aes;
-  uint8_t iv0[INITIAL_VECTOR_SIZE];
-  size_t iv_offset;
-
-  aes_setkey_enc (&aes, key, 128); /* This is setkey_enc, because of CFB.  */
-  memcpy (iv0, iv, INITIAL_VECTOR_SIZE);
-  iv_offset = 0;
-  aes_crypt_cfb128 (&aes, AES_DECRYPT, len, &iv_offset, iv0, data, data);
+  struct AES_ctx aes;
+  AES_init_ctx_iv(&aes, key, iv);
+  AES_CFB_decrypt(&aes, data, len);
 
   DEBUG_INFO ("DEC\r\n");
   DEBUG_BINARY (data, len);
@@ -989,19 +980,17 @@ decrypt (const uint8_t *key, const uint8_t *iv, uint8_t *data, int len)
 static void
 encrypt_dek (const uint8_t *key_string, uint8_t *dek)
 {
-  aes_context aes;
-
-  aes_setkey_enc (&aes, key_string, 128);
-  aes_crypt_ecb (&aes, AES_ENCRYPT, dek, dek);
+  struct AES_ctx aes;
+  AES_init_ctx(&aes, key_string);
+  AES_ECB_encrypt(&aes, dek);
 }
 
 static void
 decrypt_dek (const uint8_t *key_string, uint8_t *dek)
 {
-  aes_context aes;
-
-  aes_setkey_dec (&aes, key_string, 128);
-  aes_crypt_ecb (&aes, AES_DECRYPT, dek, dek);
+  struct AES_ctx aes;
+  AES_init_ctx(&aes, key_string);
+  AES_ECB_decrypt(&aes, dek);
 }
 
 static uint8_t
@@ -1477,6 +1466,7 @@ proc_key_import (const uint8_t *data, int len)
       return 1;
     }
 
+  #ifdef ALGO_ENABLE_RSA
   if (attr == ALGO_RSA2K)
     {
       /* It should starts with 00 01 00 01 (E), skiping E (4-byte) */
@@ -1493,7 +1483,9 @@ proc_key_import (const uint8_t *data, int len)
 	r = gpg_do_write_prvkey (kk, &data[28], len - 28, keystring_admin,
 				 pubkey);
     }
-  else if (attr == ALGO_NISTP256R1)
+  else
+  #endif
+  if (attr == ALGO_NISTP256R1)
     {
       r = ecc_compute_public_p256r1 (&data[12], pubkey);
       if (r >= 0)
@@ -2188,6 +2180,7 @@ gpg_do_keygen (uint8_t *buf)
   DEBUG_INFO ("Keygen\r\n");
   DEBUG_BYTE (kk_byte);
 
+  #ifdef ALGO_ENABLE_RSA
   if (attr == ALGO_RSA2K || attr == ALGO_RSA4K)
     {
       if (rsa_genkey (prvkey_len, pubkey, p_q) < 0)
@@ -2198,7 +2191,9 @@ gpg_do_keygen (uint8_t *buf)
 
       prv = p_q;
     }
-  else if (attr == ALGO_NISTP256R1 || attr == ALGO_SECP256K1)
+  else
+  #endif
+  if (attr == ALGO_NISTP256R1 || attr == ALGO_SECP256K1)
     {
       const uint8_t *p;
       int i;

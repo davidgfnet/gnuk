@@ -38,6 +38,9 @@ help=no
 vidpid=none
 target=FST_01
 with_dfu=default
+disable_flash_support=no
+slow_crypto=no
+rsa_support=yes
 debug=no
 sys1_compat=yes
 pinpad=no
@@ -101,10 +104,22 @@ for option; do
     factory_reset=yes ;;
   --disable-factory-reset)
     factory_reset=no ;;
-  --with-dfu)
-    with_dfu=yes ;;
+  --with-dfu=*)
+    with_dfu=$optarg ;;
   --without-dfu)
     with_dfu=no ;;
+  --disable-flash-upgrade)
+    disable_flash_support=yes ;;
+  --enable-flash-upgrade)
+    disable_flash_support=no ;;
+  --enable-rsa-support)
+    rsa_support=yes ;;
+  --disable-rsa-support)
+    rsa_support=no ;;
+  --slow-crypto)
+    slow_crypto=yes ;;
+  --fast-crypto)
+    slow_crypto=no ;;
   #
   # For emulation
   #
@@ -158,7 +173,14 @@ Configuration:
   --disable-sys1-compat	disable SYS 1.0 compatibility	[no]
 			   executable is target independent
 			   but requires SYS 2.0 or newer
-  --with-dfu		build image for DFU 		[<target specific>]
+  --with-dfu=size_KB		build image for DFU 		[<target specific>]
+               specify the number of KBs used by the DFU bootloader.
+  --disable-flash-upgrade
+            Disable flash upgrade via USB functionality    [no]
+  --enable-rsa-support
+            Enable support for RSA crypto    [yes]
+  --slow-crypto
+            Enable slow crypto in exchange for binary size    [no]
 EOF
   exit 0
 fi
@@ -182,7 +204,7 @@ BLUE_PILL|STM8S_DISCOVERY)
   ;;
 CQ_STARM|STBEE_MINI)
   if test "$with_dfu" = "default"; then
-    with_dfu=yes;
+    with_dfu=12;
   fi  ;;
 STM32_PRIMER2)
   FLASH_PAGE_SIZE=2048
@@ -194,7 +216,7 @@ STBEE)
   FLASH_SIZE=512
   MEMORY_SIZE=64
   if test "$with_dfu" = "default"; then
-    with_dfu=yes;
+    with_dfu=12;
   fi  ;;
 *)
   ;;
@@ -248,22 +270,55 @@ else
   echo "Debug option disabled"
 fi
 
+# --disable-flash-upgrade option
+if test "$disable_flash_support" = "yes"; then
+  echo "Flash upgrades disabled"
+  disable_flash_support="yes"
+else
+  echo "Configured to support flash upgrades"
+  disable_flash_support=""
+  if test "$rsa_support" = "no"; then
+    echo "Can't enable Flash Upgrades without RSA support"
+    exit 1
+  fi
+fi
+
+# --slow-crypto option
+if test "$slow_crypto" = "yes"; then
+  echo "Slow (size optimized) crypto enabled"
+  slow_crypto="yes"
+else
+  echo "Fast crypto enabled"
+  slow_crypto=""
+fi
+
+# --enable-rsa-support option
+if test "$rsa_support" = "yes"; then
+  echo "RSA crypto enabled"
+  rsa_support="yes"
+else
+  echo "RSA crypto disabled"
+  rsa_support=""
+fi
+
+
 # --with-dfu option
-if test "$with_dfu" = "yes"; then
+if test "$with_dfu" = "no" -o "$with_dfu" = "default"; then
+  with_dfu=no
+  echo "Configured for bare system (no-DFU)"
+  ORIGIN=0x08000000
+  DFU_DEFINE="#undef DFU_SUPPORT"
+else
   if test "$target" = "FST_01" -o "$target" = "FST_01G" \
      -o "$target" = "FST_01_00"; then
       echo "FST-01 doesn't have DFU loader, you should not use --with-dfu." >&2
       exit 1
   fi
-  echo "Configured for DFU"
-  ORIGIN=0x08003000
-  FLASH_SIZE=$((FLASH_SIZE - 12))
+  echo "Configured for DFU, stage size $with_dfu KB"
+  offset=$((1024*$with_dfu))
+  ORIGIN="0x08000000 + $offset"
+  FLASH_SIZE=$((FLASH_SIZE - $with_dfu))
   DFU_DEFINE="#define DFU_SUPPORT 1"
-else
-  with_dfu=no
-  echo "Configured for bare system (no-DFU)"
-  ORIGIN=0x08000000
-  DFU_DEFINE="#undef DFU_SUPPORT"
 fi
 
 # --enable-pinpad option
@@ -440,6 +495,9 @@ fi
 
 (echo "CHIP=$chip";
  echo "EMULATION=$emulation";
+ echo "DISABLE_FLASH_UPGRADES=$disable_flash_support";
+ echo "RSA_SUPPORT=$rsa_support";
+ echo "OPTIMIZE_SIZE=$slow_crypto";
  echo "CROSS=$cross";
  echo "MCU=$mcu";
  echo "DEFS=$use_sys3 $flash_override $def_emulation $def_memory_size";

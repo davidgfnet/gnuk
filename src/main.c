@@ -250,7 +250,7 @@ main (int argc, const char *argv[])
     {
       fprintf (stdout, "Usage: %s [--vidpid=Vxxx:Pxxx] [flash-image-file]",
 	       argv[0]);
-      exit (0);
+      return 0;
     }
 
   if (argc >= 2 && !strncmp (argv[1], "--debug=", 8))
@@ -288,7 +288,7 @@ main (int argc, const char *argv[])
       if (p == NULL)
 	{
 	  fprintf (stderr, "Can't find $HOME\n");
-	  exit (1);
+	  return 1;
 	}
 
       path_string = malloc (strlen (p) + strlen (FLASH_IMAGE_NAME) + 2);
@@ -396,7 +396,7 @@ main (int argc, const char *argv[])
   entry = calculate_regnual_entry_address (&_regnual_start);
 #ifdef DFU_SUPPORT
 #define FLASH_SYS_START_ADDR 0x08000000
-#define FLASH_SYS_END_ADDR (0x08000000+0x1000)
+#define FLASH_SYS_END_ADDR (0x08000000+0x400)
 #define CHIP_ID_REG ((uint32_t *)0xE0042000)
   {
     extern uint8_t _sys;
@@ -425,7 +425,7 @@ main (int argc, const char *argv[])
   flash_erase_all_and_exec ((void (*)(void))entry);
 #endif
 #else
-  exit (0);
+  return 0;
 #endif
 
   /* Never reached */
